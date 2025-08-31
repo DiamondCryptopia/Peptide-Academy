@@ -1,0 +1,442 @@
+--- a/document.html+++ b/document.html@@ -1650,6 +1650,23 @@       </div>
+     </section>
+ 
++    <!-- Modals -->
++    <div id="addEntryModal" class="modal">
++      <div class="modal-content">
++        <div class="modal-header">
++          <h3 id="modal-title">Add New Entry</h3>
++          <span class="close" onclick="closeModal()">&times;</span>
++        </div>
++        <div id="modal-body">
++          <!-- Dynamic form content will be inserted here -->
++        </div>
++        <div style="text-align: right; margin-top: 20px;">
++          <button class="btn btn-success" id="save-btn" onclick="saveEntry()">Save</button>
++          <button class="btn" onclick="closeModal()">Cancel</button>
++        </div>
++      </div>
++    </div>
++
+     <footer style="text-align: center; margin-top: 50px; padding: 20px; border-top: 1px solid #ddd; color: #6c757d">
+       <p>
+         <strong>Disclaimer:</strong> This dashboard is for research and educational purposes only. Always consult
+@@ -1657,5 +1674,419 @@       </p>
+       <p style="font-size: 12px">© 2024 Peptide Research Dashboard - For Research Use Only</p>
+     </footer>
++
++    <script>
++      // Global Variables
++      let currentTheme = 'light';
++      let chartInstances = {};
++
++      // Theme Toggle Functionality
++      function toggleTheme() {
++        currentTheme = currentTheme === 'light' ? 'dark' : 'light';
++        document.documentElement.setAttribute('data-theme', currentTheme);
++        const icon = document.getElementById('theme-icon');
++        icon.className = currentTheme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
++        localStorage.setItem('theme', currentTheme);
++      }
++
++      // Load saved theme
++      document.addEventListener('DOMContentLoaded', function() {
++        const savedTheme = localStorage.getItem('theme') || 'light';
++        currentTheme = savedTheme;
++        document.documentElement.setAttribute('data-theme', savedTheme);
++        const icon = document.getElementById('theme-icon');
++        icon.className = savedTheme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
++        
++        initializeCharts();
++        initializeSearch();
++        updateDashboardStats();
++        loadDataFromStorage();
++      });
++
++      // Initialize Charts
++      function initializeCharts() {
++        // Weight Progress Chart
++        const weightCtx = document.getElementById('weightChart');
++        if (weightCtx) {
++          chartInstances.weight = new Chart(weightCtx, {
++            type: 'line',
++            data: {
++              labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'],
++              datasets: [{
++                label: 'Weight (lbs)',
++                data: [180, 178, 176, 174, 173, 172],
++                borderColor: '#3498db',
++                backgroundColor: 'rgba(52, 152, 219, 0.1)',
++                tension: 0.4
++              }]
++            },
++            options: {
++              responsive: true,
++              maintainAspectRatio: false,
++              scales: {
++                y: {
++                  beginAtZero: false,
++                  min: 165
++                }
++              }
++            }
++          });
++        }
++
++        // Compliance Chart
++        const complianceCtx = document.getElementById('complianceChart');
++        if (complianceCtx) {
++          chartInstances.compliance = new Chart(complianceCtx, {
++            type: 'doughnut',
++            data: {
++              labels: ['Compliant', 'Missed'],
++              datasets: [{
++                data: [87, 13],
++                backgroundColor: ['#27ae60', '#e74c3c'],
++                borderWidth: 0
++              }]
++            },
++            options: {
++              responsive: true,
++              maintainAspectRatio: false,
++              plugins: {
++                legend: {
++                  position: 'bottom'
++                }
++              }
++            }
++          });
++        }
++
++        // IGF-1 Trends Chart
++        const igf1Ctx = document.getElementById('igf1Chart');
++        if (igf1Ctx) {
++          chartInstances.igf1 = new Chart(igf1Ctx, {
++            type: 'line',
++            data: {
++              labels: ['Baseline', 'Week 2', 'Week 4', 'Week 6'],
++              datasets: [{
++                label: 'IGF-1 (ng/ml)',
++                data: [185, 205, 245, 265],
++                borderColor: '#9b59b6',
++                backgroundColor: 'rgba(155, 89, 182, 0.1)',
++                tension: 0.4
++              }]
++            },
++            options: {
++              responsive: true,
++              maintainAspectRatio: false
++            }
++          });
++        }
++
++        // Glucose Chart
++        const glucoseCtx = document.getElementById('glucoseChart');
++        if (glucoseCtx) {
++          chartInstances.glucose = new Chart(glucoseCtx, {
++            type: 'bar',
++            data: {
++              labels: ['Baseline', 'Month 1', 'Month 2'],
++              datasets: [{
++                label: 'HbA1c (%)',
++                data: [6.2, 5.8, 5.4],
++                backgroundColor: '#f39c12',
++                borderColor: '#e67e22',
++                borderWidth: 1
++              }]
++            },
++            options: {
++              responsive: true,
++              maintainAspectRatio: false,
++              scales: {
++                y: {
++                  beginAtZero: false,
++                  min: 4
++                }
++              }
++            }
++          });
++        }
++      }
++
++      // Search Functionality
++      function initializeSearch() {
++        const searchInputs = document.querySelectorAll('.search-input');
++        searchInputs.forEach(input => {
++          input.addEventListener('input', function() {
++            const searchTerm = this.value.toLowerCase();
++            const tableId = this.id.replace('-search', '-table');
++            const table = document.getElementById(tableId);
++            if (table) {
++              const rows = table.querySelectorAll('tbody tr');
++              rows.forEach(row => {
++                const text = row.textContent.toLowerCase();
++                row.style.display = text.includes(searchTerm) ? '' : 'none';
++              });
++            }
++          });
++        });
++      }
++
++      // Modal Functions
++      function openModal(title, bodyContent) {
++        document.getElementById('modal-title').textContent = title;
++        document.getElementById('modal-body').innerHTML = bodyContent;
++        document.getElementById('addEntryModal').style.display = 'block';
++      }
++
++      function closeModal() {
++        document.getElementById('addEntryModal').style.display = 'none';
++      }
++
++      function addReconstitutionEntry() {
++        const formContent = `
++          <div class="form-group">
++            <label class="form-label">Peptide Name:</label>
++            <input type="text" class="form-control" id="new-peptide" placeholder="BPC-157">
++          </div>
++          <div class="form-group">
++            <label class="form-label">Vial Size (mg):</label>
++            <input type="number" class="form-control" id="new-vial-size" placeholder="5">
++          </div>
++          <div class="form-group">
++            <label class="form-label">Water Added (ml):</label>
++            <input type="number" class="form-control" id="new-water" placeholder="2.5">
++          </div>
++          <div class="form-group">
++            <label class="form-label">Storage Temperature:</label>
++            <input type="text" class="form-control" id="new-temp" placeholder="4°C">
++          </div>
++          <div class="form-group">
++            <label class="form-label">Notes:</label>
++            <textarea class="form-control" id="new-notes" placeholder="Additional notes..."></textarea>
++          </div>
++        `;
++        openModal('Add Reconstitution Entry', formContent);
++      }
++
++      function addBiomarkerEntry() {
++        const formContent = `
++          <div class="form-group">
++            <label class="form-label">Test Date:</label>
++            <input type="date" class="form-control" id="new-test-date">
++          </div>
++          <div class="form-group">
++            <label class="form-label">Biomarker:</label>
++            <select class="form-control" id="new-biomarker">
++              <option value="IGF-1">IGF-1</option>
++              <option value="HbA1c">HbA1c</option>
++              <option value="Testosterone">Testosterone</option>
++              <option value="Growth Hormone">Growth Hormone</option>
++              <option value="Cortisol">Cortisol</option>
++              <option value="Lipid Panel">Lipid Panel</option>
++            </select>
++          </div>
++          <div class="form-group">
++            <label class="form-label">Value:</label>
++            <input type="number" class="form-control" id="new-value" placeholder="185">
++          </div>
++          <div class="form-group">
++            <label class="form-label">Unit:</label>
++            <input type="text" class="form-control" id="new-unit" placeholder="ng/ml">
++          </div>
++          <div class="form-group">
++            <label class="form-label">Protocol Phase:</label>
++            <input type="text" class="form-control" id="new-protocol-phase" placeholder="Week 4 CJC">
++          </div>
++        `;
++        openModal('Add Biomarker Test', formContent);
++      }
++
++      function saveEntry() {
++        alert('Entry saved successfully!');
++        closeModal();
++      }
++
++      function deleteRow(button) {
++        if (confirm('Are you sure you want to delete this entry?')) {
++          button.closest('tr').remove();
++        }
++      }
++
++      // Calculator Functions
++      function calculateReconstitution() {
++        const peptideAmount = parseFloat(document.getElementById('peptide-amount').value);
++        const desiredConcentration = parseFloat(document.getElementById('desired-concentration').value);
++        
++        if (peptideAmount && desiredConcentration) {
++          const waterNeeded = peptideAmount / desiredConcentration;
++          const result = `
++            <div class="calc-result">
++              <strong>Results:</strong><br>
++              Water needed: <strong>${waterNeeded.toFixed(2)} ml</strong><br>
++              Final concentration: <strong>${desiredConcentration} mg/ml</strong><br>
++              Total volume: <strong>${waterNeeded.toFixed(2)} ml</strong>
++            </div>
++          `;
++          document.getElementById('reconstitution-result').innerHTML = result;
++        }
++      }
++
++      function calculateDosage() {
++        const weight = parseFloat(document.getElementById('body-weight').value);
++        const peptide = document.getElementById('peptide-select').value;
++        const experience = document.getElementById('experience-level').value;
++        
++        const dosageMap = {
++          'bpc157': { beginner: 2.5, intermediate: 5, advanced: 10 },
++          'tb500': { beginner: 2, intermediate: 5, advanced: 10 },
++          'semaglutide': { beginner: 0.25, intermediate: 0.5, advanced: 1 },
++          'cjc1295': { beginner: 1, intermediate: 2, advanced: 3 },
++          'ipamorelin': { beginner: 100, intermediate: 200, advanced: 300 }
++        };
++        
++        if (weight && peptide && experience) {
++          const baseDose = dosageMap[peptide][experience];
++          const adjustedDose = baseDose * (weight / 70);
++          
++          const result = `
++            <div class="calc-result">
++              <strong>Recommended Dosage:</strong><br>
++              Base dose: <strong>${baseDose} mcg</strong><br>
++              Weight adjusted: <strong>${adjustedDose.toFixed(2)} mcg</strong><br>
++              Frequency: <strong>Daily (consult protocols)</strong>
++            </div>
++          `;
++          document.getElementById('dosage-result').innerHTML = result;
++        }
++      }
++
++      function calculateTiming() {
++        const halfLife = parseFloat(document.getElementById('half-life').value);
++        const initialDose = parseFloat(document.getElementById('initial-dose').value);
++        const targetLevel = parseFloat(document.getElementById('target-level').value);
++        
++        if (halfLife && initialDose && targetLevel) {
++          const timeToTarget = halfLife * Math.log2(100 / targetLevel);
++          const remainingAmount = initialDose * (targetLevel / 100);
++          
++          const result = `
++            <div class="calc-result">
++              <strong>Timing Results:</strong><br>
++              Time to ${targetLevel}%: <strong>${timeToTarget.toFixed(1)} hours</strong><br>
++              Remaining amount: <strong>${remainingAmount.toFixed(2)} mg</strong><br>
++              Next dose recommended: <strong>${timeToTarget.toFixed(1)} hours from initial dose</strong>
++            </div>
++          `;
++          document.getElementById('timing-result').innerHTML = result;
++        }
++      }
++
++      function calculateCost() {
++        const monthlyBudget = parseFloat(document.getElementById('monthly-budget').value);
++        const currentSpend = parseFloat(document.getElementById('current-spend').value);
++        const protocolDuration = parseFloat(document.getElementById('protocol-duration').value);
++        
++        if (monthlyBudget && currentSpend && protocolDuration) {
++          const totalCost = currentSpend * (protocolDuration / 4);
++          const budgetUtilization = (currentSpend / monthlyBudget) * 100;
++          const remaining = monthlyBudget - currentSpend;
++          
++          const result = `
++            <div class="calc-result">
++              <strong>Cost Analysis:</strong><br>
++              Total protocol cost: <strong>$${totalCost.toFixed(2)}</strong><br>
++              Budget utilization: <strong>${budgetUtilization.toFixed(1)}%</strong><br>
++              Monthly remaining: <strong>$${remaining.toFixed(2)}</strong><br>
++              Cost per week: <strong>$${(currentSpend / 4).toFixed(2)}</strong>
++            </div>
++          `;
++          document.getElementById('cost-result').innerHTML = result;
++        }
++      }
++
++      // Export Functions
++      function exportData(type) {
++        const table = document.getElementById(type + '-table');
++        if (!table) return;
++        
++        const data = [];
++        const headers = [];
++        
++        table.querySelectorAll('thead th').forEach(th => {
++          if (!th.textContent.includes('Actions')) {
++            headers.push(th.textContent.trim());
++          }
++        });
++        
++        table.querySelectorAll('tbody tr').forEach(row => {
++          const rowData = [];
++          row.querySelectorAll('td').forEach((td, index) => {
++            if (index < headers.length) {
++              rowData.push(td.textContent.trim());
++            }
++          });
++          if (rowData.length > 0) data.push(rowData);
++        });
++        
++        const csvContent = [headers.join(','), ...data.map(row => row.join(','))].join('\n');
++        
++        const blob = new Blob([csvContent], { type: 'text/csv' });
++        const url = window.URL.createObjectURL(blob);
++        const a = document.createElement('a');
++        a.href = url;
++        a.download = `${type}-export-${new Date().toISOString().split('T')[0]}.csv`;
++        document.body.appendChild(a);
++        a.click();
++        document.body.removeChild(a);
++        window.URL.revokeObjectURL(url);
++      }
++
++      function updateDashboardStats() {
++        document.getElementById('active-protocols').textContent = '3';
++        document.getElementById('total-peptides').textContent = '12';
++        document.getElementById('weight-change').textContent = '-8';
++        document.getElementById('compliance-rate').textContent = '87';
++      }
++
++      function saveData() {
++        const data = {
++          reconstitution: [],
++          biomarkers: [],
++          protocols: []
++        };
++        localStorage.setItem('peptideData', JSON.stringify(data));
++      }
++
++      function loadDataFromStorage() {
++        const saved = localStorage.getItem('peptideData');
++        if (saved) {
++          console.log('Loading saved data...');
++        }
++      }
++
++      function uploadLabResults() {
++        const input = document.createElement('input');
++        input.type = 'file';
++        input.accept = '.pdf,.jpg,.png';
++        input.onchange = function(e) {
++          const file = e.target.files[0];
++          if (file) {
++            alert(`Lab file "${file.name}" uploaded successfully!`);
++          }
++        };
++        input.click();
++      }
++
++      document.addEventListener('input', function(e) {
++        if (e.target.classList.contains('editable')) {
++          clearTimeout(window.autoSaveTimer);
++          window.autoSaveTimer = setTimeout(saveData, 2000);
++        }
++      });
++
++      window.onclick = function(event) {
++        const modal = document.getElementById('addEntryModal');
++        if (event.target === modal) {
++          closeModal();
++        }
++      };
++    </script>
+   </body>
+ </html>
